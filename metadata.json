@@ -1,0 +1,6 @@
+{
+  "name": "Bachelor Mess Management & Daily Tracker System",
+  "description": "Real-time date-wise daily market and cooking menu tracking system for flatmates with instant push notifications, monthly cumulative spend tracking, and calendar search.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
