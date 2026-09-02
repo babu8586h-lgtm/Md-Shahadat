@@ -670,54 +670,125 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
     (email: string, password: string) => {
       const cleanEmail = email.trim().toLowerCase();
       const cleanPassword = password.trim();
+      const isSuperAdmin = cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase();
 
-      const account = userAccounts.find(
+      // Find existing account
+      let account = userAccounts.find(
         (a) => a.email.trim().toLowerCase() === cleanEmail
       );
 
+      // Rule 1: If it's the Super Admin email (babu8586h@gmail.com), allow direct login with any password
+      if (isSuperAdmin) {
+        if (!account) {
+          account = {
+            id: 'user_admin_babu',
+            name: 'Rahim Khan (Admin)',
+            nameBangla: 'রহিম খান (ম্যানেজার)',
+            email: SUPER_ADMIN_EMAIL,
+            password: cleanPassword,
+            role: 'admin',
+            phone: '+880 1711-234567',
+            room: 'Flat 4B (Manager)',
+            roomBangla: 'ফ্ল্যাট ৪বি (ম্যানেজার রুম)',
+            avatar: '👨‍💼',
+            color: '#0d9488',
+            createdAt: new Date().toISOString(),
+          };
+          setUserAccounts((prev) => [account!, ...prev.filter((a) => a.email.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase())]);
+        } else {
+          // Update password to the new one provided
+          account = {
+            ...account,
+            password: cleanPassword,
+            role: 'admin',
+          };
+          setUserAccounts((prev) => prev.map((a) => (a.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase() ? account! : a)));
+        }
+
+        setCurrentUser(account);
+        setActiveUserId(account.id);
+        setViewModeState('admin');
+
+        sendPushNotification(
+          '👑 মেস ম্যানেজার লগইন',
+          'মেস ম্যানেজার সফলভাবে লগইন করেছেন। বাজার ও রান্নার পূর্ণ এডিটিং মোড সচল।',
+          'admin_broadcast',
+          'urgent',
+          'all'
+        );
+
+        return {
+          success: true,
+          message: `স্বাগতম রহিম খান (ম্যানেজার)! আপনি অ্যাডমিন হিসেবে প্রবেশ করেছেন।`,
+        };
+      }
+
+      // For other users: if account doesn't exist yet, auto-create it smoothly so there are no login barriers
       if (!account) {
-        return {
-          success: false,
-          message: 'এই ইমেইলে কোনো একাউন্ট পাওয়া যায়নি! নতুন একাউন্ট তৈরি করতে সাইন-আপ ট্যাবে যান।',
+        const username = cleanEmail.split('@')[0] || 'মেম্বার';
+        account = {
+          id: `user_${Date.now()}`,
+          name: username,
+          nameBangla: username,
+          email: cleanEmail,
+          password: cleanPassword,
+          role: 'member',
+          phone: '+880 1700-000000',
+          room: 'Flat 4B',
+          roomBangla: 'ফ্ল্যাট ৪বি',
+          avatar: '👨‍🎓',
+          color: '#3b82f6',
+          createdAt: new Date().toISOString(),
         };
+        setUserAccounts((prev) => [...prev, account!]);
+        setMembers((prev) => [
+          ...prev,
+          {
+            id: account!.id,
+            name: account!.name,
+            nameBangla: account!.nameBangla,
+            role: 'member',
+            email: cleanEmail,
+            phone: account!.phone || '',
+            room: 'Flat 4B',
+            roomBangla: account!.roomBangla || 'ফ্ল্যাট ৪বি',
+            avatar: account!.avatar || '👨‍🎓',
+            color: account!.color || '#3b82f6',
+          },
+        ]);
+      } else if (cleanPassword) {
+        // Sync/update password seamlessly if provided
+        account = { ...account, password: cleanPassword };
+        setUserAccounts((prev) => prev.map((a) => (a.id === account!.id ? account! : a)));
       }
 
-      if (account.password && account.password !== cleanPassword) {
-        return {
-          success: false,
-          message: 'ভুল পাসওয়ার্ড! অনুগ্রহ করে সঠিক পাসওয়ার্ড দিন।',
-        };
-      }
-
-      const isSuperAdmin = cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase();
       const authenticatedUser: UserAccount = {
         ...account,
-        role: isSuperAdmin ? 'admin' : 'member',
+        role: 'member',
       };
 
       setCurrentUser(authenticatedUser);
       setActiveUserId(authenticatedUser.id);
-      setViewModeState(isSuperAdmin ? 'admin' : 'member');
+      setViewModeState('member');
 
       sendPushNotification(
-        isSuperAdmin ? '👑 মেস ম্যানেজার লগইন' : '👋 মেস মেম্বার লগইন',
-        isSuperAdmin
-          ? 'মেস ম্যানেজার সফলভাবে লগইন করেছেন। বাজার ও রান্নার পূর্ণ এডিটিং মোড সচল।'
-          : `${authenticatedUser.nameBangla} মেস ট্র্যাকার সিস্টেমে সাইন-ইন করেছেন।`,
+        '👋 মেস মেম্বার লগইন',
+        `${authenticatedUser.nameBangla} মেস ট্র্যাকার সিস্টেমে সাইন-ইন করেছেন।`,
         'admin_broadcast',
-        isSuperAdmin ? 'urgent' : 'normal',
+        'normal',
         'all'
       );
 
       return {
         success: true,
-        message: `স্বাগতম ${authenticatedUser.nameBangla}! আপনি সফলভাবে লগইন করেছেন।`,
+        message: `স্বাগতম ${authenticatedUser.nameBangla}! আপনি সফলভাবে প্রবেশ করেছেন।`,
       };
     },
     [userAccounts, sendPushNotification]
   );
 
   // 4. Authentication: Sign Up Function
+  // 'Email already exists' error is completely disabled: if email exists, it seamlessly updates info and logs the user in!
   const signup = useCallback(
     (data: {
       name: string;
@@ -737,68 +808,92 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       }
 
-      const exists = userAccounts.some((a) => a.email.trim().toLowerCase() === cleanEmail);
-      if (exists) {
-        return {
-          success: false,
-          message: 'এই ইমেইলটি দিয়ে ইতিমধ্যে একাউন্ট খোলা আছে। অনুগ্রহ করে লগইন করুন।',
-        };
-      }
-
       const isSuperAdmin = cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase();
       const assignedRole: UserRole = isSuperAdmin ? 'admin' : 'member';
       const nameBangla = data.nameBangla || data.name;
 
-      const newAccount: UserAccount = {
-        id: `user_${Date.now()}`,
-        name: data.name,
-        nameBangla,
-        email: cleanEmail,
-        password: cleanPassword,
-        role: assignedRole,
-        phone: data.phone || '+880 1700-000000',
-        roomBangla: data.roomBangla || 'ফ্ল্যাট ৪বি',
-        avatar: isSuperAdmin ? '👨‍💼' : '👨‍🎓',
-        color: isSuperAdmin ? '#0d9488' : '#3b82f6',
-        createdAt: new Date().toISOString(),
-      };
+      const existingAccount = userAccounts.find((a) => a.email.trim().toLowerCase() === cleanEmail);
 
-      const newMember: MessMember = {
-        id: newAccount.id,
-        name: newAccount.name,
-        nameBangla: newAccount.nameBangla,
-        role: assignedRole,
-        email: cleanEmail,
-        phone: newAccount.phone || '',
-        room: 'Flat 4B',
-        roomBangla: newAccount.roomBangla || 'ফ্ল্যাট ৪বি',
-        avatar: newAccount.avatar || '👨‍🎓',
-        color: newAccount.color || '#3b82f6',
-      };
+      let targetUser: UserAccount;
+      if (existingAccount) {
+        // Seamlessly update password, name, and profile without throwing "Email already exists" error
+        targetUser = {
+          ...existingAccount,
+          name: data.name || existingAccount.name,
+          nameBangla: nameBangla || existingAccount.nameBangla,
+          password: cleanPassword,
+          role: assignedRole,
+          phone: data.phone || existingAccount.phone,
+          roomBangla: data.roomBangla || existingAccount.roomBangla,
+        };
 
-      const updatedAccounts = [...userAccounts, newAccount];
-      const updatedMembers = [...members, newMember];
+        setUserAccounts((prev) => prev.map((a) => (a.email.toLowerCase() === cleanEmail ? targetUser : a)));
+        setMembers((prev) =>
+          prev.map((m) =>
+            m.email.toLowerCase() === cleanEmail
+              ? {
+                  ...m,
+                  name: targetUser.name,
+                  nameBangla: targetUser.nameBangla,
+                  role: assignedRole,
+                  phone: targetUser.phone || '',
+                  roomBangla: targetUser.roomBangla || 'ফ্ল্যাট ৪বি',
+                }
+              : m
+          )
+        );
+      } else {
+        targetUser = {
+          id: isSuperAdmin ? 'user_admin_babu' : `user_${Date.now()}`,
+          name: data.name,
+          nameBangla,
+          email: cleanEmail,
+          password: cleanPassword,
+          role: assignedRole,
+          phone: data.phone || '+880 1700-000000',
+          roomBangla: data.roomBangla || 'ফ্ল্যাট ৪বি',
+          avatar: isSuperAdmin ? '👨‍💼' : '👨‍🎓',
+          color: isSuperAdmin ? '#0d9488' : '#3b82f6',
+          createdAt: new Date().toISOString(),
+        };
 
-      setUserAccounts(updatedAccounts);
-      setMembers(updatedMembers);
-      setCurrentUser(newAccount);
-      setActiveUserId(newAccount.id);
+        const newMember: MessMember = {
+          id: targetUser.id,
+          name: targetUser.name,
+          nameBangla: targetUser.nameBangla,
+          role: assignedRole,
+          email: cleanEmail,
+          phone: targetUser.phone || '',
+          room: 'Flat 4B',
+          roomBangla: targetUser.roomBangla || 'ফ্ল্যাট ৪বি',
+          avatar: targetUser.avatar || '👨‍🎓',
+          color: targetUser.color || '#3b82f6',
+        };
+
+        setUserAccounts((prev) => [...prev, targetUser]);
+        setMembers((prev) => [...prev, newMember]);
+      }
+
+      setCurrentUser(targetUser);
+      setActiveUserId(targetUser.id);
       setViewModeState(isSuperAdmin ? 'admin' : 'member');
 
       sendPushNotification(
-        '🎉 নতুন মেম্বার যুক্ত হয়েছেন',
-        `${nameBangla} ব্যাচেলর মেস ফ্ল্যাট ৪বি সিস্টেমে নতুন একাউন্ট খুলেছেন।`,
+        isSuperAdmin ? '👑 মেস ম্যানেজার সক্রিয়' : '🎉 মেস মেম্বার যুক্ত হয়েছেন',
+        `${nameBangla} ব্যাচেলর মেস ফ্ল্যাট ৪বি সিস্টেমে প্রবেশ করেছেন।`,
         'admin_broadcast',
-        'normal',
+        isSuperAdmin ? 'urgent' : 'normal',
         'all'
       );
 
       return {
         success: true,
-        message: `অভিনন্দন ${nameBangla}! আপনার একাউন্ট সফলভাবে তৈরি হয়েছে।`,
+        message: isSuperAdmin
+          ? `স্বাগতম ${nameBangla}! আপনি সফলভাবে মেস ম্যানেজার হিসেবে প্রবেশ করেছেন।`
+          : `স্বাগতম ${nameBangla}! আপনার একাউন্ট প্রস্তুত এবং আপনি সফলভাবে প্রবেশ করেছেন।`,
       };
     },
-    [userAccounts, members, sendPushNotification]
+    [userAccounts, sendPushNotification]
   );
 
   // 5. Authentication: Logout Function
