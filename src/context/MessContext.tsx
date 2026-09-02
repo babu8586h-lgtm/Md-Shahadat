@@ -104,6 +104,7 @@ const MessContext = createContext<MessContextType | undefined>(undefined);
 
 // Internal secret constant for verified super admin - NEVER displayed to public UI
 const SUPER_ADMIN_EMAIL = 'babu8586h@gmail.com';
+const FIXED_ADMIN_PASSWORD = 'admin1234';
 
 const INITIAL_ACCOUNTS: UserAccount[] = [
   {
@@ -111,7 +112,7 @@ const INITIAL_ACCOUNTS: UserAccount[] = [
     name: 'Rahim Khan (Admin)',
     nameBangla: 'রহিম খান (ম্যানেজার)',
     email: 'babu8586h@gmail.com',
-    password: 'password123',
+    password: 'admin1234',
     role: 'admin',
     phone: '+880 1711-234567',
     room: 'Flat 4B (Manager)',
@@ -677,8 +678,17 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
         (a) => a.email.trim().toLowerCase() === cleanEmail
       );
 
-      // Rule 1: If it's the Super Admin email (babu8586h@gmail.com), allow direct login with any password
+      // Rule 1: If it's the Super Admin email (babu8586h@gmail.com)
       if (isSuperAdmin) {
+        const isValidAdminPassword = cleanPassword === FIXED_ADMIN_PASSWORD || (account && account.password === cleanPassword);
+        
+        if (!isValidAdminPassword) {
+          return {
+            success: false,
+            message: 'ভুল অ্যাডমিন পাসওয়ার্ড! অনুগ্রহ করে সঠিক পাসওয়ার্ড দিন (যেমন: admin1234)।',
+          };
+        }
+
         if (!account) {
           account = {
             id: 'user_admin_babu',
@@ -723,43 +733,20 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       }
 
-      // For other users: if account doesn't exist yet, auto-create it smoothly so there are no login barriers
+      // For regular members: check if account exists
       if (!account) {
-        const username = cleanEmail.split('@')[0] || 'মেম্বার';
-        account = {
-          id: `user_${Date.now()}`,
-          name: username,
-          nameBangla: username,
-          email: cleanEmail,
-          password: cleanPassword,
-          role: 'member',
-          phone: '+880 1700-000000',
-          room: 'Flat 4B',
-          roomBangla: 'ফ্ল্যাট ৪বি',
-          avatar: '👨‍🎓',
-          color: '#3b82f6',
-          createdAt: new Date().toISOString(),
+        return {
+          success: false,
+          message: 'এই ইমেইলে কোনো একাউন্ট পাওয়া যায়নি! দয়া করে "নতুন একাউন্ট (Sign Up)" ট্যাবে গিয়ে একাউন্ট খুলুন।',
         };
-        setUserAccounts((prev) => [...prev, account!]);
-        setMembers((prev) => [
-          ...prev,
-          {
-            id: account!.id,
-            name: account!.name,
-            nameBangla: account!.nameBangla,
-            role: 'member',
-            email: cleanEmail,
-            phone: account!.phone || '',
-            room: 'Flat 4B',
-            roomBangla: account!.roomBangla || 'ফ্ল্যাট ৪বি',
-            avatar: account!.avatar || '👨‍🎓',
-            color: account!.color || '#3b82f6',
-          },
-        ]);
-      } else if (cleanPassword) {
-        // Sync/update password seamlessly if provided
-        account = { ...account, password: cleanPassword };
-        setUserAccounts((prev) => prev.map((a) => (a.id === account!.id ? account! : a)));
+      }
+
+      // Check password
+      if (account.password && account.password !== cleanPassword) {
+        return {
+          success: false,
+          message: 'ভুল পাসওয়ার্ড! অনুগ্রহ করে সঠিক পাসওয়ার্ড দিয়ে চেষ্টা করুন।',
+        };
       }
 
       const authenticatedUser: UserAccount = {

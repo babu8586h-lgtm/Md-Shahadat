@@ -7,8 +7,6 @@ import {
   User,
   Eye,
   EyeOff,
-  ShieldCheck,
-  UserCheck,
   Sparkles,
   ArrowRight,
   AlertCircle,
@@ -103,19 +101,6 @@ export const AuthScreen: React.FC = () => {
         setSuccessMsg(result.message);
       }
     }, 300);
-  };
-
-  const fillDemoAccount = (demoType: 'admin' | 'member') => {
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    setTab('signin');
-    if (demoType === 'admin') {
-      setEmail('babu8586h@gmail.com');
-      setPassword('password123');
-    } else {
-      setEmail('karim@gmail.com');
-      setPassword('password123');
-    }
   };
 
   return (
@@ -265,31 +250,6 @@ export const AuthScreen: React.FC = () => {
                   </>
                 )}
               </button>
-
-              {/* Fast Demo Shortcuts */}
-              <div className="pt-4 border-t border-slate-800/80">
-                <div className="text-[11px] text-slate-400 text-center mb-2.5 font-medium">
-                  অথবা দ্রুত টেস্ট করতে ডেমো একাউন্টে ক্লিক করুন:
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => fillDemoAccount('admin')}
-                    className="p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                    <span>ম্যানেজার ডেমো</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => fillDemoAccount('member')}
-                    className="p-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-300 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <UserCheck className="w-3.5 h-3.5 text-blue-400" />
-                    <span>মেম্বার ডেমো</span>
-                  </button>
-                </div>
-              </div>
             </form>
           ) : (
             /* Form: Sign Up */
