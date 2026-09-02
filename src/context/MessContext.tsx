@@ -18,6 +18,13 @@ interface MessContextType {
   language: AppLanguage;
   setLanguage: (lang: AppLanguage) => void;
 
+  // Super Admin Security & Authentication
+  superAdminEmail: string;
+  isAdminAuthenticated: boolean;
+  authenticatedEmail: string | null;
+  loginAdmin: (email: string, pin?: string) => { success: boolean; message: string };
+  logoutAdmin: () => void;
+
   // Members & Roles
   members: MessMember[];
   activeUserId: string;
@@ -86,12 +93,15 @@ interface MessContextType {
 
 const MessContext = createContext<MessContextType | undefined>(undefined);
 
+export const SUPER_ADMIN_EMAIL = 'babu8586h@gmail.com';
+
 const INITIAL_MEMBERS: MessMember[] = [
   {
     id: 'user_rahim',
     name: 'Rahim Khan',
     nameBangla: 'রহিম খান (ম্যানেজার/অ্যাডমিন)',
     role: 'admin',
+    email: 'babu8586h@gmail.com',
     phone: '+880 1711-234567',
     room: 'Flat 4B (Admin)',
     roomBangla: 'ফ্ল্যাট ৪বি (ম্যানেজার রুম)',
@@ -103,6 +113,7 @@ const INITIAL_MEMBERS: MessMember[] = [
     name: 'Karim Ahmed',
     nameBangla: 'করিম আহমেদ',
     role: 'member',
+    email: 'karim@gmail.com',
     phone: '+880 1812-987654',
     room: 'Flat 4B (Bed 1)',
     roomBangla: 'ফ্ল্যাট ৪বি (রুম ১)',
@@ -114,6 +125,7 @@ const INITIAL_MEMBERS: MessMember[] = [
     name: 'Tanvir Hasan',
     nameBangla: 'তানভীর হাসান',
     role: 'member',
+    email: 'tanvir@gmail.com',
     phone: '+880 1913-456789',
     room: 'Flat 4B (Bed 2)',
     roomBangla: 'ফ্ল্যাট ৪বি (রুম ২)',
@@ -125,6 +137,7 @@ const INITIAL_MEMBERS: MessMember[] = [
     name: 'Sakib Al Mahmud',
     nameBangla: 'সাকিব আল মাহমুদ',
     role: 'member',
+    email: 'sakib@gmail.com',
     phone: '+880 1614-112233',
     room: 'Flat 4B (Bed 3)',
     roomBangla: 'ফ্ল্যাট ৪বি (রুম ৩)',
@@ -263,17 +276,40 @@ const INITIAL_NOTIFICATIONS: PushNotification[] = [
 ];
 
 const STORAGE_KEYS = {
-  MARKET_LOGS: 'bachelor_mess_market_logs_v4',
-  MEMBERS: 'bachelor_mess_members_v4',
-  NOTIFS: 'bachelor_mess_notifs_v4',
-  ACTIVE_USER: 'bachelor_mess_active_user_v4',
-  VIEW_MODE: 'bachelor_mess_view_mode_v4',
-  LANGUAGE: 'bachelor_mess_lang_v4',
+  MARKET_LOGS: 'bachelor_mess_market_logs_v5',
+  MEMBERS: 'bachelor_mess_members_v5',
+  NOTIFS: 'bachelor_mess_notifs_v5',
+  ACTIVE_USER: 'bachelor_mess_active_user_v5',
+  VIEW_MODE: 'bachelor_mess_view_mode_v5',
+  LANGUAGE: 'bachelor_mess_lang_v5',
+  ADMIN_AUTH: 'bachelor_mess_admin_auth_v5',
+  ADMIN_EMAIL: 'bachelor_mess_admin_email_v5',
 };
 
-const SYNC_CHANNEL_NAME = 'bachelor_mess_sync_bus_v4';
+const SYNC_CHANNEL_NAME = 'bachelor_mess_sync_bus_v5';
 
 export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const superAdminEmail = SUPER_ADMIN_EMAIL;
+
+  // Admin authentication state: Checked against super admin email (babu8586h@gmail.com)
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    try {
+      const auth = localStorage.getItem(STORAGE_KEYS.ADMIN_AUTH);
+      const email = localStorage.getItem(STORAGE_KEYS.ADMIN_EMAIL);
+      return auth === 'true' && email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+    } catch {
+      return false;
+    }
+  });
+
+  const [authenticatedEmail, setAuthenticatedEmail] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.ADMIN_EMAIL) || null;
+    } catch {
+      return null;
+    }
+  });
+
   const [language, setLanguage] = useState<AppLanguage>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.LANGUAGE);
@@ -295,20 +331,49 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [activeUserId, setActiveUserId] = useState<string>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.ACTIVE_USER);
-      return saved || 'user_rahim';
+      if (saved) return saved;
+      return isAdminAuthenticated ? 'user_rahim' : 'user_karim';
     } catch {
-      return 'user_rahim';
+      return 'user_karim';
     }
   });
 
-  const [viewMode, setViewMode] = useState<'admin' | 'member'>(() => {
+  const [viewModeState, setViewModeState] = useState<'admin' | 'member'>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.VIEW_MODE);
-      return (saved as 'admin' | 'member') || 'admin';
+      const auth = localStorage.getItem(STORAGE_KEYS.ADMIN_AUTH);
+      if (auth === 'true' && saved === 'admin') {
+        return 'admin';
+      }
+      return 'member';
     } catch {
-      return 'admin';
+      return 'member';
     }
   });
+
+  // Strict View Mode: Only allows 'admin' if isAdminAuthenticated is true
+  const viewMode = isAdminAuthenticated && viewModeState === 'admin' ? 'admin' : 'member';
+
+  const setViewMode = useCallback(
+    (mode: 'admin' | 'member') => {
+      if (mode === 'admin') {
+        if (!isAdminAuthenticated) {
+          // Block unauthorized role elevation
+          return;
+        }
+        setViewModeState('admin');
+        setActiveUserId('user_rahim');
+        localStorage.setItem(STORAGE_KEYS.VIEW_MODE, 'admin');
+      } else {
+        setViewModeState('member');
+        if (activeUserId === 'user_rahim') {
+          setActiveUserId('user_karim');
+        }
+        localStorage.setItem(STORAGE_KEYS.VIEW_MODE, 'member');
+      }
+    },
+    [isAdminAuthenticated, activeUserId]
+  );
 
   const [marketLogs, setMarketLogs] = useState<MarketLog[]>(() => {
     try {
@@ -357,6 +422,27 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.MARKET_LOGS, JSON.stringify(marketLogs));
   }, [marketLogs]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.NOTIFS, JSON.stringify(notifications));
+  }, [notifications]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, activeUserId);
+  }, [activeUserId]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.VIEW_MODE, viewModeState);
+  }, [viewModeState]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, String(isAdminAuthenticated));
+    if (authenticatedEmail) {
+      localStorage.setItem(STORAGE_KEYS.ADMIN_EMAIL, authenticatedEmail);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.ADMIN_EMAIL);
+    }
+  }, [isAdminAuthenticated, authenticatedEmail]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.NOTIFS, JSON.stringify(notifications));
@@ -614,10 +700,75 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLatestToast(null);
   };
 
-  // Add or Update Market Log in Bengali with Push Notification Trigger
+  // Login Super Admin
+  const loginAdmin = useCallback(
+    (email: string, _pin?: string) => {
+      const cleanEmail = email.trim().toLowerCase();
+      if (cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase()) {
+        setIsAdminAuthenticated(true);
+        setAuthenticatedEmail(SUPER_ADMIN_EMAIL);
+        setViewModeState('admin');
+        setActiveUserId('user_rahim');
+        localStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, 'true');
+        localStorage.setItem(STORAGE_KEYS.ADMIN_EMAIL, SUPER_ADMIN_EMAIL);
+        localStorage.setItem(STORAGE_KEYS.VIEW_MODE, 'admin');
+
+        sendPushNotification(
+          '👑 অ্যাডমিন লগইন সফল',
+          `${SUPER_ADMIN_EMAIL} অ্যাকাউন্টটি সফলভাবে অ্যাডমিন হিসেবে অথেনটিকেটেড হয়েছে।`,
+          'admin_broadcast',
+          'urgent',
+          'all'
+        );
+
+        return {
+          success: true,
+          message: `স্বাগতম! আপনি (${SUPER_ADMIN_EMAIL}) হিসেবে সফলভাবে অ্যাডমিন প্যানেলে প্রবেশ করেছেন।`,
+        };
+      } else {
+        return {
+          success: false,
+          message: `অননুমোদিত ইমেইল (${email})! শুধুমাত্র ${SUPER_ADMIN_EMAIL} অ্যাডমিন হিসেবে সাইন-ইন করে ডেটা এন্ট্রি ও এডিট করতে পারেন। সাধারণ সদস্যরা কেবল দেখতে পারবেন।`,
+        };
+      }
+    },
+    [sendPushNotification]
+  );
+
+  // Logout Super Admin
+  const logoutAdmin = useCallback(() => {
+    setIsAdminAuthenticated(false);
+    setAuthenticatedEmail(null);
+    setViewModeState('member');
+    setActiveUserId('user_karim');
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_AUTH);
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_EMAIL);
+    localStorage.setItem(STORAGE_KEYS.VIEW_MODE, 'member');
+
+    sendPushNotification(
+      '🔒 অ্যাডমিন মোড লক করা হয়েছে',
+      'অ্যাডমিন সেশন শেষ হয়েছে। সিস্টেম বর্তমানে সাধারণ মেম্বার ভিউতে রয়েছে।',
+      'admin_broadcast',
+      'normal',
+      'all'
+    );
+  }, [sendPushNotification]);
+
+  // Add or Update Market Log in Bengali with Push Notification Trigger (Admin-Guarded)
   const addOrUpdateMarketLog = (
     logData: Omit<MarketLog, 'id' | 'timestamp' | 'recordedBy'> & { id?: string }
   ) => {
+    if (!isAdminAuthenticated) {
+      sendPushNotification(
+        '⚠️ এন্ট্রি ব্যর্থ: অনুমতি নেই',
+        'শুধুমাত্র অনুমোদিত অ্যাডমিন (babu8586h@gmail.com) বাজার খরচ এন্ট্রি বা এডিট করতে পারবেন।',
+        'admin_broadcast',
+        'urgent',
+        'all'
+      );
+      return;
+    }
+
     setIsSyncing(true);
     const existingIndex = marketLogs.findIndex(
       (l) => l.id === logData.id || l.date === logData.date
@@ -670,7 +821,6 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updatedLogs = [newLog, ...marketLogs];
       setMarketLogs(updatedLogs);
 
-      // Example requested: "📢 আজকের বাজারের আপডেট: আলু ও ডিম কেনা হয়েছে, খরচ: ৳২০০।"
       const title = formattedDate.isToday
         ? `📢 আজকের বাজারের আপডেট: খরচ ${formatBengaliCurrency(newLog.amount)}`
         : `🛒 ${formattedDate.monthDayBangla}র বাজার এন্ট্রি: ${formatBengaliCurrency(newLog.amount)}`;
@@ -693,25 +843,6 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Broadcast live sync
     broadcastSync(updatedLogs, emittedNotif);
 
-    // Firebase Cloud Messaging (FCM) Push Notification Trigger simulation
-    console.info('[FCM Push Notification Triggered]', {
-      fcmPayload: {
-        notification: {
-          title: emittedNotif.title,
-          body: emittedNotif.body,
-        },
-        data: {
-          logId: existingIndex >= 0 ? marketLogs[existingIndex].id : logData.id,
-          date: logData.date,
-          amount: String(logData.amount),
-          shopper: logData.shopperName,
-          items: logData.itemsBought,
-          menu: logData.menuCooked,
-        },
-        topic: 'flat4b_market_updates',
-      },
-    });
-
     setTimeout(() => {
       setIsSyncing(false);
       setLastSyncedTime(new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }));
@@ -722,6 +853,10 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const handleAddExpense = addOrUpdateMarketLog;
 
   const deleteMarketLog = (id: string) => {
+    if (!isAdminAuthenticated) {
+      return;
+    }
+
     const target = marketLogs.find((l) => l.id === id);
     if (!target) return;
 
@@ -745,11 +880,15 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetToSampleData = () => {
+    if (!isAdminAuthenticated) {
+      return;
+    }
+
     setMarketLogs(INITIAL_MARKET_LOGS);
     setMembers(INITIAL_MEMBERS);
     setNotifications(INITIAL_NOTIFICATIONS);
     setActiveUserId('user_rahim');
-    setViewMode('admin');
+    setViewModeState('admin');
     setSelectedDate(getTodayDateString());
     setSearchQuery('');
     setSelectedFilter('all');
@@ -772,11 +911,16 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         language,
         setLanguage,
+        superAdminEmail,
+        isAdminAuthenticated,
+        authenticatedEmail,
+        loginAdmin,
+        logoutAdmin,
         members,
         activeUserId,
         setActiveUserId,
         activeUser,
-        isAdmin,
+        isAdmin: isAdminAuthenticated,
         viewMode,
         setViewMode,
         marketLogs,

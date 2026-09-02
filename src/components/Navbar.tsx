@@ -18,12 +18,14 @@ interface NavbarProps {
   onOpenNotificationDrawer: () => void;
   onOpenAddMarketModal: () => void;
   onOpenBroadcastModal: () => void;
+  onOpenAdminLoginModal: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenNotificationDrawer,
   onOpenAddMarketModal,
   onOpenBroadcastModal,
+  onOpenAdminLoginModal,
 }) => {
   const {
     activeUser,
@@ -36,20 +38,13 @@ export const Navbar: React.FC<NavbarProps> = ({
     formatMoney,
     resetToSampleData,
     language,
-    setLanguage,
     webNotificationPermission,
     requestNotificationPermission,
     isSyncing,
-    lastSyncedTime,
+    isAdminAuthenticated,
+    superAdminEmail,
+    logoutAdmin,
   } = useMess();
-
-  const handleMemberSelect = (memberId: string) => {
-    setActiveUserId(memberId);
-    const member = members.find((m) => m.id === memberId);
-    if (member) {
-      setViewMode(member.role === 'admin' ? 'admin' : 'member');
-    }
-  };
 
   return (
     <header className="sticky top-0 z-40 bg-[#0F172A]/90 backdrop-blur-xl border-b border-slate-800/80 shadow-2xl shadow-indigo-950/20">
@@ -84,21 +79,30 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            <span className="text-slate-400 text-[11px] hidden sm:inline">
-              রোল:{' '}
-              <strong className={viewMode === 'admin' ? 'text-amber-400' : 'text-indigo-300'}>
-                {viewMode === 'admin' ? '⚡ ম্যানেজার (অ্যাডমিন)' : '👀 মেম্বার ভিউ'}
-              </strong>
-            </span>
+            <div className="flex items-center gap-1.5">
+              {isAdminAuthenticated ? (
+                <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                  <ShieldAlert className="w-3 h-3 text-amber-400" />
+                  <span className="hidden sm:inline">ভেরিফাইড অ্যাডমিন ({superAdminEmail})</span>
+                  <span className="sm:hidden">অ্যাডমিন</span>
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1">
+                  <span>🔒 সাধারণ মেম্বার (Read Only)</span>
+                </span>
+              )}
+            </div>
 
-            <button
-              onClick={resetToSampleData}
-              className="text-slate-400 hover:text-white text-[10px] hidden lg:flex items-center gap-1 transition-colors cursor-pointer"
-              title="নমুনা ডেটায় রিস্টোর করুন"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>রিসেট ডেমো</span>
-            </button>
+            {isAdminAuthenticated && (
+              <button
+                onClick={resetToSampleData}
+                className="text-slate-400 hover:text-white text-[10px] hidden lg:flex items-center gap-1 transition-colors cursor-pointer"
+                title="নমুনা ডেটায় রিস্টোর করুন"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>রিসেট ডেমো</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -110,76 +114,57 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Center / Right Controls */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Admin / Member Switcher */}
-          <div className="p-1 rounded-2xl bg-slate-800/80 border border-slate-700/80 flex items-center gap-1 shadow-inner">
-            <button
-              onClick={() => {
-                setViewMode('admin');
-                setActiveUserId('user_rahim');
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'admin'
-                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-extrabold shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              <span>অ্যাডমিন</span>
-            </button>
-            <button
-              onClick={() => {
-                setViewMode('member');
-                if (activeUser.role === 'admin') {
-                  setActiveUserId('user_karim');
-                }
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'member'
-                  ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <UserCheck className="w-3.5 h-3.5" />
-              <span>মেম্বার</span>
-            </button>
-          </div>
+          {/* Admin Authentication & Mode Switcher */}
+          {isAdminAuthenticated ? (
+            <div className="flex items-center gap-2">
+              <div className="px-3 py-1.5 rounded-2xl bg-amber-950/40 border border-amber-500/40 text-xs font-bold text-amber-300 flex items-center gap-1.5 shadow-md shadow-amber-950/20">
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">অ্যাডমিন সক্রিয়</span>
+              </div>
 
-          {/* User Persona Selector */}
-          <div className="hidden xl:flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/80 rounded-2xl px-3 py-1.5 text-xs text-white">
-            <span className="text-slate-400 font-medium">ব্যবহারকারী:</span>
-            <select
-              value={activeUser.id}
-              onChange={(e) => handleMemberSelect(e.target.value)}
-              className="bg-transparent font-bold text-indigo-300 focus:outline-hidden cursor-pointer"
-            >
-              {members.map((m) => (
-                <option key={m.id} value={m.id} className="bg-slate-900 text-white">
-                  {m.avatar} {m.nameBangla}
-                </option>
-              ))}
-            </select>
-          </div>
+              {/* Fast Action: Add Market Log in Bengali */}
+              <button
+                onClick={onOpenAddMarketModal}
+                className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 via-blue-600 to-violet-600 hover:from-indigo-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-indigo-500/25 transition-all cursor-pointer"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>বাজার এন্ট্রি</span>
+              </button>
 
-          {/* Admin Fast Action: Add Market Log in Bengali */}
-          {viewMode === 'admin' && (
-            <button
-              onClick={onOpenAddMarketModal}
-              className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 via-blue-600 to-violet-600 hover:from-indigo-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-indigo-500/25 transition-all cursor-pointer"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>বাজার এন্ট্রি</span>
-            </button>
-          )}
+              {/* Fast Action: Push Alert Broadcast */}
+              <button
+                onClick={onOpenBroadcastModal}
+                className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/80 text-amber-300 font-bold text-xs transition-colors cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>পুশ ব্রডকাস্ট</span>
+              </button>
 
-          {/* Admin Fast Action: Push Alert Broadcast */}
-          {viewMode === 'admin' && (
-            <button
-              onClick={onOpenBroadcastModal}
-              className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/80 text-amber-300 font-bold text-xs transition-colors cursor-pointer"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>পুশ ব্রডকাস্ট</span>
-            </button>
+              {/* Lock / Logout Admin Button */}
+              <button
+                onClick={logoutAdmin}
+                className="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-rose-950/40 border border-slate-700 hover:border-rose-500/40 text-slate-300 hover:text-rose-300 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                title="অ্যাডমিন সেশন লক করুন"
+              >
+                <span>লক / প্রস্থান</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-slate-800/60 border border-slate-700/60 text-xs text-slate-400">
+                <UserCheck className="w-3.5 h-3.5 text-indigo-400" />
+                <span>মেম্বার ভিউ (রিড-অনলি)</span>
+              </div>
+
+              {/* Admin Login Trigger Button */}
+              <button
+                onClick={onOpenAdminLoginModal}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+              >
+                <ShieldAlert className="w-3.5 h-3.5" />
+                <span>ম্যানেজার লগইন</span>
+              </button>
+            </div>
           )}
 
           {/* Push Notifications Bell with Alert Badge */}

@@ -6,19 +6,25 @@ import { MarketLogModal } from './components/MarketLogModal';
 import { PushNotificationDrawer } from './components/PushNotificationDrawer';
 import { BroadcastModal } from './components/BroadcastModal';
 import { LivePushToast } from './components/LivePushToast';
+import { AdminLoginModal } from './components/AdminLoginModal';
 import { MarketLog } from './types';
 
 const MainAppContent: React.FC = () => {
-  const { viewMode, setViewMode } = useMess();
+  const { viewMode, setViewMode, isAdminAuthenticated } = useMess();
 
   // Modals state
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
   const [isMarketLogModalOpen, setIsMarketLogModalOpen] = useState(false);
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
+  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
   const [editingLog, setEditingLog] = useState<MarketLog | null>(null);
   const [targetDateForNewLog, setTargetDateForNewLog] = useState<string | undefined>(undefined);
 
   const handleOpenAddMarketModal = (log?: MarketLog, targetDate?: string) => {
+    if (!isAdminAuthenticated) {
+      setIsAdminLoginModalOpen(true);
+      return;
+    }
     setEditingLog(log || null);
     setTargetDateForNewLog(targetDate);
     setIsMarketLogModalOpen(true);
@@ -35,15 +41,29 @@ const MainAppContent: React.FC = () => {
       <Navbar
         onOpenNotificationDrawer={() => setIsNotificationDrawerOpen(true)}
         onOpenAddMarketModal={() => handleOpenAddMarketModal()}
-        onOpenBroadcastModal={() => setIsBroadcastModalOpen(true)}
+        onOpenBroadcastModal={() => {
+          if (!isAdminAuthenticated) {
+            setIsAdminLoginModalOpen(true);
+          } else {
+            setIsBroadcastModalOpen(true);
+          }
+        }}
+        onOpenAdminLoginModal={() => setIsAdminLoginModalOpen(true)}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-6">
         <Dashboard
           onOpenAddMarketModal={handleOpenAddMarketModal}
-          onOpenBroadcastModal={() => setIsBroadcastModalOpen(true)}
+          onOpenBroadcastModal={() => {
+            if (!isAdminAuthenticated) {
+              setIsAdminLoginModalOpen(true);
+            } else {
+              setIsBroadcastModalOpen(true);
+            }
+          }}
           onOpenNotificationDrawer={() => setIsNotificationDrawerOpen(true)}
+          onOpenAdminLoginModal={() => setIsAdminLoginModalOpen(true)}
         />
       </main>
 
@@ -54,7 +74,13 @@ const MainAppContent: React.FC = () => {
       <PushNotificationDrawer
         isOpen={isNotificationDrawerOpen}
         onClose={() => setIsNotificationDrawerOpen(false)}
-        onOpenBroadcastModal={() => setIsBroadcastModalOpen(true)}
+        onOpenBroadcastModal={() => {
+          if (!isAdminAuthenticated) {
+            setIsAdminLoginModalOpen(true);
+          } else {
+            setIsBroadcastModalOpen(true);
+          }
+        }}
       />
 
       <MarketLogModal
@@ -71,6 +97,12 @@ const MainAppContent: React.FC = () => {
       <BroadcastModal
         isOpen={isBroadcastModalOpen}
         onClose={() => setIsBroadcastModalOpen(false)}
+      />
+
+      {/* Super Admin Security Modal */}
+      <AdminLoginModal
+        isOpen={isAdminLoginModalOpen}
+        onClose={() => setIsAdminLoginModalOpen(false)}
       />
     </div>
   );

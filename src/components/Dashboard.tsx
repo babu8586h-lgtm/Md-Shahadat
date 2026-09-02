@@ -29,12 +29,14 @@ interface DashboardProps {
   onOpenAddMarketModal: (log?: MarketLog, targetDate?: string) => void;
   onOpenBroadcastModal: () => void;
   onOpenNotificationDrawer: () => void;
+  onOpenAdminLoginModal?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
   onOpenAddMarketModal,
   onOpenBroadcastModal,
   onOpenNotificationDrawer,
+  onOpenAdminLoginModal,
 }) => {
   const {
     marketLogs,
@@ -54,6 +56,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     notifications,
     unreadNotificationCount,
     isAdmin,
+    isAdminAuthenticated,
+    superAdminEmail,
   } = useMess();
 
   const [specificDateFilter, setSpecificDateFilter] = useState<string>('');

@@ -1,26 +1,37 @@
 export type UserRole = 'admin' | 'member';
+export type AppLanguage = 'bn' | 'en';
+
+export interface AdminAuthState {
+  isAuthenticated: boolean;
+  email: string | null;
+  adminName: string;
+  loginTime?: string;
+}
 
 export interface MessMember {
   id: string;
   name: string;
+  nameBangla: string;
   role: UserRole;
   phone: string;
   room: string;
+  roomBangla: string;
   avatar: string;
   color: string;
+  email?: string;
 }
 
 export interface MarketLog {
   id: string;
   date: string; // ISO Date YYYY-MM-DD
-  itemsBought: string; // e.g. "Chicken 1.5kg, Spinach 2 bunches, Potatoes, Green Chillies"
-  menuCooked: string; // e.g. "Chicken Curry, Spinach Bhaji, Thick Lentil Dal & Rice"
-  amount: number; // e.g. 350
-  shopperName: string; // Who went to market
+  itemsBought: string; // e.g. "১.৫ কেজি মুরগি, ২ আঁটি লাল শাক, আলু ও কাঁচা মরিচ"
+  menuCooked: string; // e.g. "মুরগির মাংসের ভুনা ঝোল, লাল শাক ভাজি, মসুর ডাল ও ভাত"
+  amount: number; // e.g. 350 (formatted as ৳৩৫০)
+  shopperName: string; // Who went to market (e.g. "করিম আহমেদ")
   recordedBy: string; // Admin ID
   isPlanned?: boolean; // True if it's a planned/future date entry
-  notes?: string; // Additional info / receipts
-  timestamp: string; // When recorded/updated
+  notes?: string; // Additional info / receipts in Bengali or English
+  timestamp: string; // ISO string when recorded/updated
 }
 
 export interface PushNotification {
