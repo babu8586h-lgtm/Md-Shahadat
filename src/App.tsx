@@ -6,23 +6,26 @@ import { MarketLogModal } from './components/MarketLogModal';
 import { PushNotificationDrawer } from './components/PushNotificationDrawer';
 import { BroadcastModal } from './components/BroadcastModal';
 import { LivePushToast } from './components/LivePushToast';
-import { AdminLoginModal } from './components/AdminLoginModal';
+import { AuthScreen } from './components/AuthScreen';
 import { MarketLog } from './types';
 
 const MainAppContent: React.FC = () => {
-  const { viewMode, setViewMode, isAdminAuthenticated } = useMess();
+  const { isLoggedIn, isAdmin } = useMess();
 
   // Modals state
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
   const [isMarketLogModalOpen, setIsMarketLogModalOpen] = useState(false);
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
-  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
   const [editingLog, setEditingLog] = useState<MarketLog | null>(null);
   const [targetDateForNewLog, setTargetDateForNewLog] = useState<string | undefined>(undefined);
 
+  // If not authenticated, render the dedicated Sign In / Sign Up gate
+  if (!isLoggedIn) {
+    return <AuthScreen />;
+  }
+
   const handleOpenAddMarketModal = (log?: MarketLog, targetDate?: string) => {
-    if (!isAdminAuthenticated) {
-      setIsAdminLoginModalOpen(true);
+    if (!isAdmin) {
       return;
     }
     setEditingLog(log || null);
@@ -42,13 +45,10 @@ const MainAppContent: React.FC = () => {
         onOpenNotificationDrawer={() => setIsNotificationDrawerOpen(true)}
         onOpenAddMarketModal={() => handleOpenAddMarketModal()}
         onOpenBroadcastModal={() => {
-          if (!isAdminAuthenticated) {
-            setIsAdminLoginModalOpen(true);
-          } else {
+          if (isAdmin) {
             setIsBroadcastModalOpen(true);
           }
         }}
-        onOpenAdminLoginModal={() => setIsAdminLoginModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -56,14 +56,11 @@ const MainAppContent: React.FC = () => {
         <Dashboard
           onOpenAddMarketModal={handleOpenAddMarketModal}
           onOpenBroadcastModal={() => {
-            if (!isAdminAuthenticated) {
-              setIsAdminLoginModalOpen(true);
-            } else {
+            if (isAdmin) {
               setIsBroadcastModalOpen(true);
             }
           }}
           onOpenNotificationDrawer={() => setIsNotificationDrawerOpen(true)}
-          onOpenAdminLoginModal={() => setIsAdminLoginModalOpen(true)}
         />
       </main>
 
@@ -75,9 +72,7 @@ const MainAppContent: React.FC = () => {
         isOpen={isNotificationDrawerOpen}
         onClose={() => setIsNotificationDrawerOpen(false)}
         onOpenBroadcastModal={() => {
-          if (!isAdminAuthenticated) {
-            setIsAdminLoginModalOpen(true);
-          } else {
+          if (isAdmin) {
             setIsBroadcastModalOpen(true);
           }
         }}
@@ -98,22 +93,16 @@ const MainAppContent: React.FC = () => {
         isOpen={isBroadcastModalOpen}
         onClose={() => setIsBroadcastModalOpen(false)}
       />
-
-      {/* Super Admin Security Modal */}
-      <AdminLoginModal
-        isOpen={isAdminLoginModalOpen}
-        onClose={() => setIsAdminLoginModalOpen(false)}
-      />
     </div>
   );
 };
 
-export function App() {
+export const App: React.FC = () => {
   return (
     <MessProvider>
       <MainAppContent />
     </MessProvider>
   );
-}
+};
 
 export default App;

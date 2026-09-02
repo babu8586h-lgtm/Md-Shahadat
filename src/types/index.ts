@@ -1,11 +1,19 @@
 export type UserRole = 'admin' | 'member';
 export type AppLanguage = 'bn' | 'en';
 
-export interface AdminAuthState {
-  isAuthenticated: boolean;
-  email: string | null;
-  adminName: string;
-  loginTime?: string;
+export interface UserAccount {
+  id: string;
+  name: string;
+  nameBangla: string;
+  email: string;
+  password?: string;
+  role: UserRole;
+  phone?: string;
+  room?: string;
+  roomBangla?: string;
+  avatar?: string;
+  color?: string;
+  createdAt?: string;
 }
 
 export interface MessMember {
@@ -54,3 +62,4 @@ export interface MarketStats {
   totalMarketDays: number;
   plannedCount: number;
 }
+
