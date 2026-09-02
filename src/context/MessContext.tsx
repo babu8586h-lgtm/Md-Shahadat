@@ -505,6 +505,15 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
+  const [setupExpenses, setSetupExpenses] = useState<SetupExpense[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.SETUP_EXPENSES);
+      return saved ? JSON.parse(saved) : INITIAL_SETUP_EXPENSES;
+    } catch {
+      return INITIAL_SETUP_EXPENSES;
+    }
+  });
+
   const [notifications, setNotifications] = useState<PushNotification[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.NOTIFS);
@@ -555,6 +564,10 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.MARKET_LOGS, JSON.stringify(marketLogs));
   }, [marketLogs]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SETUP_EXPENSES, JSON.stringify(setupExpenses));
+  }, [setupExpenses]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.NOTIFS, JSON.stringify(notifications));
@@ -627,13 +640,14 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // Broadcast to other open tabs
-  const broadcastSync = useCallback((newLogs: MarketLog[], newNotif?: PushNotification) => {
+  const broadcastSync = useCallback((newLogs: MarketLog[], newNotif?: PushNotification, newSetupExpenses?: SetupExpense[]) => {
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       try {
         const channel = new BroadcastChannel(SYNC_CHANNEL_NAME);
         channel.postMessage({
           type: 'MESS_SYNC_UPDATE',
           logs: newLogs,
+          setupExpenses: newSetupExpenses || setupExpenses,
           notification: newNotif,
           timestamp: Date.now(),
         });
@@ -642,7 +656,7 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Fallback silently
       }
     }
-  }, []);
+  }, [setupExpenses]);
 
   // Listen for Live Sync across tabs
   useEffect(() => {
@@ -654,8 +668,14 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (event.data.logs) {
             setMarketLogs(event.data.logs);
           }
+          if (event.data.setupExpenses) {
+            setSetupExpenses(event.data.setupExpenses);
+          }
           if (event.data.notification) {
-            setNotifications((prev) => [event.data.notification, ...prev]);
+            setNotifications((prev) => {
+              const exists = prev.some(n => n.id === event.data.notification.id);
+              return exists ? prev : [event.data.notification, ...prev];
+            });
             setLatestToast(event.data.notification);
             triggerAudioChime();
           }
@@ -1080,12 +1100,112 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return marketLogs.find((l) => l.date === dateStr);
   };
 
+  // Add or Update Setup Expense
+  const addOrUpdateSetupExpense = (
+    itemData: Omit<SetupExpense, 'id' | 'createdAt'> & { id?: string }
+  ) => {
+    if (!isAdmin) {
+      sendPushNotification(
+        '⚠️ এন্ট্রি ব্যর্থ: অনুমতি নেই',
+        'শুধুমাত্র মেস ম্যানেজার বাসার মালামাল ও সেটআপ খরচ এন্ট্রি বা এডিট করতে পারবেন।',
+        'admin_broadcast',
+        'urgent',
+        'all'
+      );
+      return;
+    }
+
+    setIsSyncing(true);
+    let updatedExpenses: SetupExpense[];
+    let emittedNotif: PushNotification;
+
+    const existingIndex = itemData.id ? setupExpenses.findIndex((e) => e.id === itemData.id) : -1;
+
+    if (existingIndex >= 0) {
+      // Update
+      const existingId = setupExpenses[existingIndex].id;
+      const updatedItem: SetupExpense = {
+        ...setupExpenses[existingIndex],
+        ...itemData,
+        id: existingId,
+      };
+
+      updatedExpenses = [...setupExpenses];
+      updatedExpenses[existingIndex] = updatedItem;
+      setSetupExpenses(updatedExpenses);
+
+      emittedNotif = sendPushNotification(
+        `🛠️ বাসার মালামাল আপডেট: ${updatedItem.itemName}`,
+        `${updatedItem.purchasedBy} কর্তৃক ক্রয়কৃত মালামাল আপডেট করা হয়েছে। নতুন মূল্য: ${formatBengaliCurrency(updatedItem.amount)} টাকা।`,
+        'admin_broadcast',
+        'normal',
+        'all',
+        updatedItem.date,
+        updatedItem.amount
+      );
+    } else {
+      // Create
+      const newItem: SetupExpense = {
+        ...itemData,
+        id: itemData.id || `setup_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+      };
+
+      updatedExpenses = [newItem, ...setupExpenses];
+      setSetupExpenses(updatedExpenses);
+
+      emittedNotif = sendPushNotification(
+        `🏠 বাসার নতুন মালামাল ক্রয়: ${newItem.itemName}`,
+        `${newItem.purchasedBy} মেসের জন্য "${newItem.itemName}" কিনেছেন। খরচ হয়েছে ${formatBengaliCurrency(newItem.amount)} টাকা।`,
+        'admin_broadcast',
+        'normal',
+        'all',
+        newItem.date,
+        newItem.amount
+      );
+    }
+
+    broadcastSync(marketLogs, emittedNotif, updatedExpenses);
+
+    setTimeout(() => {
+      setIsSyncing(false);
+      setLastSyncedTime(new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }));
+    }, 250);
+  };
+
+  const deleteSetupExpense = (id: string) => {
+    if (!isAdmin) {
+      return;
+    }
+
+    const target = setupExpenses.find((e) => e.id === id);
+    if (!target) return;
+
+    const newExpenses = setupExpenses.filter((e) => e.id !== id);
+    setSetupExpenses(newExpenses);
+
+    const notif = sendPushNotification(
+      `🗑️ মালামালের এন্ট্রি মুছে ফেলা হয়েছে`,
+      `অ্যাডমিন "${target.itemName}" ক্রয়বাবদ খরচ (${formatBengaliCurrency(target.amount)} টাকা) বাতিল করেছেন।`,
+      'admin_broadcast',
+      'normal',
+      'all'
+    );
+
+    broadcastSync(marketLogs, notif, newExpenses);
+  };
+
+  const totalSetupExpense = useMemo(() => {
+    return setupExpenses.reduce((sum, e) => sum + e.amount, 0);
+  }, [setupExpenses]);
+
   const resetToSampleData = () => {
     if (!isAdmin) {
       return;
     }
 
     setMarketLogs(INITIAL_MARKET_LOGS);
+    setSetupExpenses(INITIAL_SETUP_EXPENSES);
     setMembers(INITIAL_MEMBERS);
     setNotifications(INITIAL_NOTIFICATIONS);
     setActiveUserId('user_admin_babu');
@@ -1102,7 +1222,7 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
       'all'
     );
 
-    broadcastSync(INITIAL_MARKET_LOGS, notif);
+    broadcastSync(INITIAL_MARKET_LOGS, notif, INITIAL_SETUP_EXPENSES);
   };
 
   // Active user resolver
@@ -1208,6 +1328,10 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleAddExpense,
         deleteMarketLog,
         getLogByDate,
+        setupExpenses,
+        addOrUpdateSetupExpense,
+        deleteSetupExpense,
+        totalSetupExpense,
         selectedDate,
         setSelectedDate,
         searchQuery,
