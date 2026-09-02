@@ -35,7 +35,9 @@ export const MarketLogModal: React.FC<MarketLogModalProps> = ({
   const [itemsBought, setItemsBought] = useState(initialLog?.itemsBought || '');
   const [menuCooked, setMenuCooked] = useState(initialLog?.menuCooked || '');
   const [amount, setAmount] = useState(initialLog ? String(initialLog.amount) : '');
-  const [shopperName, setShopperName] = useState(initialLog?.shopperName || 'Rahim Khan');
+  const [shopperName, setShopperName] = useState(
+    initialLog?.shopperName || (members[0]?.nameBangla || 'শাহাদাত হোসেন')
+  );
   const [isPlanned, setIsPlanned] = useState(initialLog?.isPlanned || false);
   const [notes, setNotes] = useState(initialLog?.notes || '');
 
@@ -223,11 +225,11 @@ export const MarketLogModal: React.FC<MarketLogModalProps> = ({
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-white text-xs font-semibold cursor-pointer"
               >
                 {members.map((m) => (
-                  <option key={m.id} value={m.name}>
-                    {m.avatar} {m.name}
+                  <option key={m.id} value={m.nameBangla || m.name}>
+                    {m.avatar} {m.nameBangla || m.name} {m.role === 'admin' ? '(ম্যানেজার)' : ''}
                   </option>
                 ))}
-                <option value="Common Pool">🤝 যৌথ তহবিল / সরাসরি বাবুর্চি</option>
+                <option value="যৌথ তহবিল / বাবুর্চি">🤝 যৌথ তহবিল / বাবুর্চি</option>
               </select>
             </div>
           </div>

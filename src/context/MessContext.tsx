@@ -7,6 +7,7 @@ import {
   UserRole,
   AppLanguage,
   UserAccount,
+  SetupExpense,
 } from '../types';
 import {
   toBengaliNumber,
@@ -53,6 +54,14 @@ interface MessContextType {
   ) => void;
   deleteMarketLog: (id: string) => void;
   getLogByDate: (date: string) => MarketLog | undefined;
+
+  // Household & Setup Expenses (বাসার মালামাল ও সেটআপ খরচ)
+  setupExpenses: SetupExpense[];
+  addOrUpdateSetupExpense: (
+    itemData: Omit<SetupExpense, 'id' | 'createdAt'> & { id?: string }
+  ) => void;
+  deleteSetupExpense: (id: string) => void;
+  totalSetupExpense: number;
 
   // Selection & Filters
   selectedDate: string;
@@ -109,12 +118,12 @@ const FIXED_ADMIN_PASSWORD = 'admin1234';
 const INITIAL_ACCOUNTS: UserAccount[] = [
   {
     id: 'user_admin_babu',
-    name: 'Rahim Khan (Admin)',
-    nameBangla: 'রহিম খান (ম্যানেজার)',
+    name: 'Shahadat Hossain',
+    nameBangla: 'শাহাদাত হোসেন',
     email: 'babu8586h@gmail.com',
     password: 'admin1234',
     role: 'admin',
-    phone: '+880 1711-234567',
+    phone: '+880 1711-000001',
     room: 'Flat 4B (Manager)',
     roomBangla: 'ফ্ল্যাট ৪বি (ম্যানেজার রুম)',
     avatar: '👨‍💼',
@@ -122,13 +131,13 @@ const INITIAL_ACCOUNTS: UserAccount[] = [
     createdAt: '2026-09-01T00:00:00.000Z',
   },
   {
-    id: 'user_karim',
-    name: 'Karim Ahmed',
-    nameBangla: 'করিম আহমেদ',
-    email: 'karim@gmail.com',
+    id: 'user_tamim',
+    name: 'Mohammad Tamim',
+    nameBangla: 'মোহাম্মদ তামিম',
+    email: 'tamim@gmail.com',
     password: 'password123',
     role: 'member',
-    phone: '+880 1812-987654',
+    phone: '+880 1711-000002',
     room: 'Flat 4B (Bed 1)',
     roomBangla: 'ফ্ল্যাট ৪বি (রুম ১)',
     avatar: '👨‍🎓',
@@ -136,13 +145,13 @@ const INITIAL_ACCOUNTS: UserAccount[] = [
     createdAt: '2026-09-01T00:00:00.000Z',
   },
   {
-    id: 'user_tanvir',
-    name: 'Tanvir Hasan',
-    nameBangla: 'তানভীর হাসান',
-    email: 'tanvir@gmail.com',
+    id: 'user_shifat',
+    name: 'Mohammad Shifat',
+    nameBangla: 'মোহাম্মদ শিফাত',
+    email: 'shifat@gmail.com',
     password: 'password123',
     role: 'member',
-    phone: '+880 1913-456789',
+    phone: '+880 1711-000003',
     room: 'Flat 4B (Bed 2)',
     roomBangla: 'ফ্ল্যাট ৪বি (রুম ২)',
     avatar: '👨‍🍳',
@@ -150,13 +159,13 @@ const INITIAL_ACCOUNTS: UserAccount[] = [
     createdAt: '2026-09-01T00:00:00.000Z',
   },
   {
-    id: 'user_sakib',
-    name: 'Sakib Al Mahmud',
-    nameBangla: 'সাকিব আল মাহমুদ',
-    email: 'sakib@gmail.com',
+    id: 'user_arafat',
+    name: 'Mohammad Arafat',
+    nameBangla: 'মোহাম্মদ আরাফাত',
+    email: 'arafat@gmail.com',
     password: 'password123',
     role: 'member',
-    phone: '+880 1614-112233',
+    phone: '+880 1711-000004',
     room: 'Flat 4B (Bed 3)',
     roomBangla: 'ফ্ল্যাট ৪বি (রুম ৩)',
     avatar: '🧑‍💻',
@@ -168,47 +177,47 @@ const INITIAL_ACCOUNTS: UserAccount[] = [
 const INITIAL_MEMBERS: MessMember[] = [
   {
     id: 'user_admin_babu',
-    name: 'Rahim Khan',
-    nameBangla: 'রহিম খান (ম্যানেজার)',
+    name: 'Shahadat Hossain',
+    nameBangla: 'শাহাদাত হোসেন',
     role: 'admin',
     email: 'babu8586h@gmail.com',
-    phone: '+880 1711-234567',
+    phone: '+880 1711-000001',
     room: 'Flat 4B (Admin)',
     roomBangla: 'ফ্ল্যাট ৪বি (ম্যানেজার রুম)',
     avatar: '👨‍💼',
     color: '#0d9488',
   },
   {
-    id: 'user_karim',
-    name: 'Karim Ahmed',
-    nameBangla: 'করিম আহমেদ',
+    id: 'user_tamim',
+    name: 'Mohammad Tamim',
+    nameBangla: 'মোহাম্মদ তামিম',
     role: 'member',
-    email: 'karim@gmail.com',
-    phone: '+880 1812-987654',
+    email: 'tamim@gmail.com',
+    phone: '+880 1711-000002',
     room: 'Flat 4B (Bed 1)',
     roomBangla: 'ফ্ল্যাট ৪বি (রুম ১)',
     avatar: '👨‍🎓',
     color: '#3b82f6',
   },
   {
-    id: 'user_tanvir',
-    name: 'Tanvir Hasan',
-    nameBangla: 'তানভীর হাসান',
+    id: 'user_shifat',
+    name: 'Mohammad Shifat',
+    nameBangla: 'মোহাম্মদ শিফাত',
     role: 'member',
-    email: 'tanvir@gmail.com',
-    phone: '+880 1913-456789',
+    email: 'shifat@gmail.com',
+    phone: '+880 1711-000003',
     room: 'Flat 4B (Bed 2)',
     roomBangla: 'ফ্ল্যাট ৪বি (রুম ২)',
     avatar: '👨‍🍳',
     color: '#8b5cf6',
   },
   {
-    id: 'user_sakib',
-    name: 'Sakib Al Mahmud',
-    nameBangla: 'সাকিব আল মাহমুদ',
+    id: 'user_arafat',
+    name: 'Mohammad Arafat',
+    nameBangla: 'মোহাম্মদ আরাফাত',
     role: 'member',
-    email: 'sakib@gmail.com',
-    phone: '+880 1614-112233',
+    email: 'arafat@gmail.com',
+    phone: '+880 1711-000004',
     room: 'Flat 4B (Bed 3)',
     roomBangla: 'ফ্ল্যাট ৪বি (রুম ৩)',
     avatar: '🧑‍💻',
@@ -240,7 +249,7 @@ const INITIAL_MARKET_LOGS: MarketLog[] = [
     itemsBought: '১.৫ কেজি দেশি মুরগি, ২ আঁটি লাল শাক, ১ কেজি আলু ও কাঁচা মরিচ',
     menuCooked: 'মুরগির মাংসের ভুনা ঝোল, লাল শাক ভাজি, মসুর ডাল ও গরম ভাত',
     amount: 350,
-    shopperName: 'করিম আহমেদ',
+    shopperName: 'মোহাম্মদ তামিম',
     recordedBy: 'user_admin_babu',
     isPlanned: false,
     notes: 'কারওয়ান বাজার থেকে কেনা হয়েছে। ফ্রেশ দেশি মুরগি।',
@@ -252,7 +261,7 @@ const INITIAL_MARKET_LOGS: MarketLog[] = [
     itemsBought: '১ কেজি রুই মাছ, ৫০০ গ্রাম বেগুন, টমেটো ও পেঁয়াজ',
     menuCooked: 'বেগুন দিয়ে রুই মাছের ঝোল, টমেটো ভর্তা, পাতলা ডাল ও ভাত',
     amount: 420,
-    shopperName: 'তানভীর হাসান',
+    shopperName: 'মোহাম্মদ শিফাত',
     recordedBy: 'user_admin_babu',
     isPlanned: false,
     notes: 'রুই মাছ কেজি ৩২০ টাকা ও সবজি ১০০ টাকা।',
@@ -264,7 +273,7 @@ const INITIAL_MARKET_LOGS: MarketLog[] = [
     itemsBought: '১ ডজন দেশি হাঁসের ডিম, ১ কেজি মিষ্টি কুমড়া, শসা ও লেবু',
     menuCooked: 'হাঁসের ডিম ভুনা, মিষ্টি কুমড়া ভাজি, ঘন ডাল ও সালাদ',
     amount: 220,
-    shopperName: 'সাকিব আল মাহমুদ',
+    shopperName: 'মোহাম্মদ আরাফাত',
     recordedBy: 'user_admin_babu',
     isPlanned: false,
     notes: 'ডিম ১৬০ টাকা ও বাকি সবজি ৬০ টাকা।',
@@ -276,7 +285,7 @@ const INITIAL_MARKET_LOGS: MarketLog[] = [
     itemsBought: '১ কেজি গরুর মাংস, ১ কেজি পোলাওয়ের চাল, সালাদ ও মশলা',
     menuCooked: 'শুক্রবার স্পেশাল: বিফ তেহারি, ঝাল পেঁয়াজের সালাদ ও বোরহানি',
     amount: 980,
-    shopperName: 'রহিম খান (ম্যানেজার)',
+    shopperName: 'শাহাদাত হোসেন',
     recordedBy: 'user_admin_babu',
     isPlanned: false,
     notes: 'শুক্রবার স্পেশাল মিলের খরচ। সবাই মিলে উৎসবমুখর খাওয়া।',
@@ -288,7 +297,7 @@ const INITIAL_MARKET_LOGS: MarketLog[] = [
     itemsBought: '১ কেজি কাচকি মাছ, কাঁচকলা, ডাটা শাক ও ধনেপাতা',
     menuCooked: 'কাচকি মাছের চচ্চড়ি, কাঁচকলা দিয়ে মসুর ডাল ও ডাটা শাক ভাজি',
     amount: 280,
-    shopperName: 'করিম আহমেদ',
+    shopperName: 'মোহাম্মদ তামিম',
     recordedBy: 'user_admin_babu',
     isPlanned: false,
     notes: 'কাচকি মাছ খুবই টাটকা ছিল।',
@@ -300,10 +309,10 @@ const INITIAL_MARKET_LOGS: MarketLog[] = [
     itemsBought: '১.২ কেজি পাঙ্গাশ/তেলাপিয়া মাছ, চালকুমড়া ও আলু (পরিকল্পিত)',
     menuCooked: 'আগামীকালের মেন্যু: চালকুমড়া দিয়ে মাছের পাতলা ঝোল ও ডাল',
     amount: 300,
-    shopperName: 'তানভীর হাসান',
+    shopperName: 'মোহাম্মদ শিফাত',
     recordedBy: 'user_admin_babu',
     isPlanned: true,
-    notes: 'সকালে দ্রুত বাজার করা হবে। তানভীরের ডিউটি।',
+    notes: 'সকালে দ্রুত বাজার করা হবে। শিফাতের ডিউটি।',
     timestamp: new Date().toISOString(),
   },
 ];
@@ -312,7 +321,7 @@ const INITIAL_NOTIFICATIONS: PushNotification[] = [
   {
     id: 'notif_001',
     title: '📢 আজকের বাজার আপডেট: খরচ ৳৩৫০',
-    body: 'আজকের বাজারের আপডেট: করিম আহমেদ ১.৫ কেজি মুরগি ও লাল শাক কিনেছেন, মোট খরচ: ৳৩৫০। মেন্যু: মুরগির মাংসের ভুনা ঝোল ও ডাল।',
+    body: 'আজকের বাজারের আপডেট: মোহাম্মদ তামিম ১.৫ কেজি মুরগি ও লাল শাক কিনেছেন, মোট খরচ: ৳৩৫০। মেন্যু: মুরগির মাংসের ভুনা ঝোল ও ডাল।',
     type: 'market_added',
     timestamp: new Date().toISOString(),
     read: false,
@@ -324,7 +333,7 @@ const INITIAL_NOTIFICATIONS: PushNotification[] = [
   {
     id: 'notif_002',
     title: '🛒 আগামীকালের রান্নার মেন্যু প্ল্যান',
-    body: 'আগামীকালের মেন্যু: চালকুমড়া দিয়ে মাছের পাতলা ঝোল ও মসুর ডাল। বাজার ডিউটি: তানভীর হাসান।',
+    body: 'আগামীকালের মেন্যু: চালকুমড়া দিয়ে মাছের পাতলা ঝোল ও মসুর ডাল। বাজার ডিউটি: মোহাম্মদ শিফাত।',
     type: 'menu_planned',
     timestamp: new Date(Date.now() - 3600000 * 3).toISOString(),
     read: false,
@@ -335,16 +344,65 @@ const INITIAL_NOTIFICATIONS: PushNotification[] = [
   },
 ];
 
+const INITIAL_SETUP_EXPENSES: SetupExpense[] = [
+  {
+    id: 'setup_001',
+    itemName: 'ডাবল বার্নার গ্যাসের চুলা ও সিলিন্ডার সেটআপ',
+    purchasedBy: 'শাহাদাত হোসেন',
+    amount: 4500,
+    date: '2026-08-25',
+    notes: 'অটো ইগনিশন ২ বার্নার চুলা, রেগুলেটর ও প্রিমিয়াম পাইপ।',
+    createdAt: '2026-08-25T10:00:00.000Z',
+  },
+  {
+    id: 'setup_002',
+    itemName: 'বিআরবি সিলিং ফ্যান (৫৬ ইঞ্চি)',
+    purchasedBy: 'মোহাম্মদ তামিম',
+    amount: 2950,
+    date: '2026-08-26',
+    notes: 'ড্রয়িং/লিভিং রুমের জন্য এনার্জি সেভিং ফ্যান।',
+    createdAt: '2026-08-26T12:00:00.000Z',
+  },
+  {
+    id: 'setup_003',
+    itemName: 'পানির ফিল্টার ও জার স্ট্যান্ড',
+    purchasedBy: 'মোহাম্মদ শিফাত',
+    amount: 1650,
+    date: '2026-08-27',
+    notes: 'খাওয়ার পানির ফিল্টার ও মেটাল স্ট্যান্ড।',
+    createdAt: '2026-08-27T15:00:00.000Z',
+  },
+  {
+    id: 'setup_004',
+    itemName: 'টিপি-লিংক ডুয়েল ব্যান্ড ওয়াইফাই রাউটার',
+    purchasedBy: 'মোহাম্মদ আরাফাত',
+    amount: 2400,
+    date: '2026-08-28',
+    notes: 'মেসের হাইস্পিড ইন্টারনেটের জন্য গিগাবিট রাউটার।',
+    createdAt: '2026-08-28T16:30:00.000Z',
+  },
+  {
+    id: 'setup_005',
+    itemName: 'বড় রাইস কুকার (২.৮ লিটার) ও রান্নার বড় কড়াই',
+    purchasedBy: 'যৌথ তহবিল',
+    amount: 3200,
+    date: '2026-08-29',
+    notes: 'মেসের ৪ জনের নিয়মিত রান্না ও ভাতের জন্য।',
+    createdAt: '2026-08-29T18:00:00.000Z',
+  },
+];
+
 const STORAGE_KEYS = {
-  ACCOUNTS: 'bachelor_mess_accounts_v6',
-  CURRENT_USER: 'bachelor_mess_current_user_v6',
-  MARKET_LOGS: 'bachelor_mess_market_logs_v6',
-  MEMBERS: 'bachelor_mess_members_v6',
-  NOTIFS: 'bachelor_mess_notifs_v6',
-  LANGUAGE: 'bachelor_mess_lang_v6',
+  ACCOUNTS: 'bachelor_mess_accounts_v7',
+  CURRENT_USER: 'bachelor_mess_current_user_v7',
+  MARKET_LOGS: 'bachelor_mess_market_logs_v7',
+  MEMBERS: 'bachelor_mess_members_v7',
+  NOTIFS: 'bachelor_mess_notifs_v7',
+  LANGUAGE: 'bachelor_mess_lang_v7',
+  SETUP_EXPENSES: 'bachelor_mess_setup_expenses_v7',
 };
 
-const SYNC_CHANNEL_NAME = 'bachelor_mess_sync_bus_v6';
+const SYNC_CHANNEL_NAME = 'bachelor_mess_sync_bus_v7';
 
 export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // 1. User Accounts State
@@ -692,12 +750,12 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!account) {
           account = {
             id: 'user_admin_babu',
-            name: 'Rahim Khan (Admin)',
-            nameBangla: 'রহিম খান (ম্যানেজার)',
+            name: 'Shahadat Hossain (Admin)',
+            nameBangla: 'শাহাদাত হোসেন',
             email: SUPER_ADMIN_EMAIL,
             password: cleanPassword,
             role: 'admin',
-            phone: '+880 1711-234567',
+            phone: '+880 1711-000001',
             room: 'Flat 4B (Manager)',
             roomBangla: 'ফ্ল্যাট ৪বি (ম্যানেজার রুম)',
             avatar: '👨‍💼',
@@ -721,7 +779,7 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         sendPushNotification(
           '👑 মেস ম্যানেজার লগইন',
-          'মেস ম্যানেজার সফলভাবে লগইন করেছেন। বাজার ও রান্নার পূর্ণ এডিটিং মোড সচল।',
+          'মেস ম্যানেজার শাহাদাত হোসেন সফলভাবে লগইন করেছেন। বাজার ও রান্নার পূর্ণ এডিটিং মোড সচল।',
           'admin_broadcast',
           'urgent',
           'all'
@@ -729,7 +787,7 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         return {
           success: true,
-          message: `স্বাগতম রহিম খান (ম্যানেজার)! আপনি অ্যাডমিন হিসেবে প্রবেশ করেছেন।`,
+          message: `স্বাগতম শাহাদাত হোসেন (ম্যানেজার)! আপনি অ্যাডমিন হিসেবে প্রবেশ করেছেন।`,
         };
       }
 

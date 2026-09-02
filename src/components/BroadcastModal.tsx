@@ -98,7 +98,7 @@ export const BroadcastModal: React.FC<BroadcastModalProps> = ({ isOpen, onClose 
                 <option value="all">👥 সকল মেম্বার (Broadcast)</option>
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.avatar} {m.name} ({m.room})
+                    {m.avatar} {m.nameBangla || m.name} ({m.roomBangla || m.room})
                   </option>
                 ))}
               </select>

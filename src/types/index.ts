@@ -55,6 +55,16 @@ export interface PushNotification {
   amount?: number;
 }
 
+export interface SetupExpense {
+  id: string;
+  itemName: string; // e.g. "সিলিং ফ্যান", "গ্যাসের চুলা"
+  purchasedBy: string; // "শাহাদাত হোসেন", "মোহাম্মদ তামিম", "মোহাম্মদ শিফাত", "মোহাম্মদ আরাফাত", "যৌথ তহবিল"
+  amount: number; // e.g. 2500
+  date: string; // YYYY-MM-DD
+  notes?: string;
+  createdAt?: string;
+}
+
 export interface MarketStats {
   totalMonthSpend: number;
   todaysSpend: number;
