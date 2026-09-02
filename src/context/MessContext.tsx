@@ -540,38 +540,30 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return 'unsupported';
   });
 
-  // Local Storage Synchronizations
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(userAccounts));
-  }, [userAccounts]);
-
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+  // Helper to sync local state modifications with Express central server
+  const syncStateWithServer = useCallback(async (updates: {
+    marketLogs?: MarketLog[];
+    setupExpenses?: SetupExpense[];
+    notifications?: PushNotification[];
+    members?: MessMember[];
+    userAccounts?: UserAccount[];
+  }) => {
+    try {
+      setIsSyncing(true);
+      await fetch('/api/state', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+      setLastSyncedTime(new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }));
+    } catch (err) {
+      console.error("Failed to post update to central server:", err);
+    } finally {
+      setIsSyncing(false);
     }
-  }, [currentUser]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.LANGUAGE, language);
-  }, [language]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
-  }, [members]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.MARKET_LOGS, JSON.stringify(marketLogs));
-  }, [marketLogs]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SETUP_EXPENSES, JSON.stringify(setupExpenses));
-  }, [setupExpenses]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.NOTIFS, JSON.stringify(notifications));
-  }, [notifications]);
+  }, []);
 
   // Audio Chime Synthesis (Web Audio API)
   const triggerAudioChime = useCallback(() => {
@@ -610,20 +602,6 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Request browser web push permission
-  const requestNotificationPermission = async () => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      setWebNotificationPermission('unsupported');
-      return;
-    }
-    try {
-      const perm = await Notification.requestPermission();
-      setWebNotificationPermission(perm);
-    } catch {
-      setWebNotificationPermission('denied');
-    }
-  };
-
   // Trigger Native Web Notification if supported
   const fireNativeWebPush = useCallback((title: string, body: string) => {
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
@@ -638,6 +616,111 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
   }, []);
+
+  // Load initial state and start real-time polling from central Express backend
+  useEffect(() => {
+    let isMounted = true;
+    let initialLoadDone = false;
+
+    const pollState = async () => {
+      try {
+        const res = await fetch('/api/state');
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          
+          // Update basic states
+          if (data.marketLogs) setMarketLogs(data.marketLogs);
+          if (data.setupExpenses) setSetupExpenses(data.setupExpenses);
+          if (data.members) setMembers(data.members);
+          if (data.userAccounts) setUserAccounts(data.userAccounts);
+
+          // Smart notification sync with native web push and audio chime triggers
+          if (data.notifications) {
+            setNotifications((prevLocalNotifs) => {
+              // Find new notifications that are on the server but not in the local state
+              const newNotifs = data.notifications.filter(
+                (srvNotif: PushNotification) => !prevLocalNotifs.some((localNotif) => localNotif.id === srvNotif.id)
+              );
+
+              // If there are new notifications and this isn't the first load, fire them!
+              if (newNotifs.length > 0 && initialLoadDone) {
+                // Play audio chime and trigger native web pushes
+                triggerAudioChime();
+                const latestNew = newNotifs[0];
+                setLatestToast(latestNew);
+                fireNativeWebPush(latestNew.title, latestNew.body);
+              }
+              
+              return data.notifications;
+            });
+          }
+
+          initialLoadDone = true;
+          setLastSyncedTime(new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }));
+        }
+      } catch (err) {
+        console.error("Failed to sync with real-time central server:", err);
+      }
+    };
+
+    // Immediate initial load
+    pollState();
+
+    // Poll every 2 seconds for ultra-responsive live sync
+    const interval = setInterval(pollState, 2000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [triggerAudioChime, fireNativeWebPush]);
+
+  // Local Storage Synchronizations
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(userAccounts));
+  }, [userAccounts]);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.LANGUAGE, language);
+  }, [language]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.MEMBERS, JSON.stringify(members));
+  }, [members]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.MARKET_LOGS, JSON.stringify(marketLogs));
+  }, [marketLogs]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SETUP_EXPENSES, JSON.stringify(setupExpenses));
+  }, [setupExpenses]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.NOTIFS, JSON.stringify(notifications));
+  }, [notifications]);
+
+  // Request browser web push permission
+  const requestNotificationPermission = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setWebNotificationPermission('unsupported');
+      return;
+    }
+    try {
+      const perm = await Notification.requestPermission();
+      setWebNotificationPermission(perm);
+    } catch {
+      setWebNotificationPermission('denied');
+    }
+  };
 
   // Broadcast to other open tabs
   const broadcastSync = useCallback((newLogs: MarketLog[], newNotif?: PushNotification, newSetupExpenses?: SetupExpense[]) => {
@@ -878,8 +961,10 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const nameBangla = data.nameBangla || data.name;
 
       const existingAccount = userAccounts.find((a) => a.email.trim().toLowerCase() === cleanEmail);
-
       let targetUser: UserAccount;
+      let nextAccounts: UserAccount[];
+      let nextMembers: MessMember[];
+
       if (existingAccount) {
         // Seamlessly update password, name, and profile without throwing "Email already exists" error
         targetUser = {
@@ -892,21 +977,21 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
           roomBangla: data.roomBangla || existingAccount.roomBangla,
         };
 
-        setUserAccounts((prev) => prev.map((a) => (a.email.toLowerCase() === cleanEmail ? targetUser : a)));
-        setMembers((prev) =>
-          prev.map((m) =>
-            m.email.toLowerCase() === cleanEmail
-              ? {
-                  ...m,
-                  name: targetUser.name,
-                  nameBangla: targetUser.nameBangla,
-                  role: assignedRole,
-                  phone: targetUser.phone || '',
-                  roomBangla: targetUser.roomBangla || 'ফ্ল্যাট ৪বি',
-                }
-              : m
-          )
+        nextAccounts = userAccounts.map((a) => (a.email.toLowerCase() === cleanEmail ? targetUser : a));
+        setUserAccounts(nextAccounts);
+        nextMembers = members.map((m) =>
+          m.email.toLowerCase() === cleanEmail
+            ? {
+                ...m,
+                name: targetUser.name,
+                nameBangla: targetUser.nameBangla,
+                role: assignedRole,
+                phone: targetUser.phone || '',
+                roomBangla: targetUser.roomBangla || 'ফ্ল্যাট ৪বি',
+              }
+            : m
         );
+        setMembers(nextMembers);
       } else {
         targetUser = {
           id: isSuperAdmin ? 'user_admin_babu' : `user_${Date.now()}`,
@@ -935,13 +1020,17 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
           color: targetUser.color || '#3b82f6',
         };
 
-        setUserAccounts((prev) => [...prev, targetUser]);
-        setMembers((prev) => [...prev, newMember]);
+        nextAccounts = [...userAccounts, targetUser];
+        nextMembers = [...members, newMember];
+        setUserAccounts(nextAccounts);
+        setMembers(nextMembers);
       }
 
       setCurrentUser(targetUser);
       setActiveUserId(targetUser.id);
       setViewModeState(isSuperAdmin ? 'admin' : 'member');
+
+      syncStateWithServer({ userAccounts: nextAccounts, members: nextMembers });
 
       sendPushNotification(
         isSuperAdmin ? '👑 মেস ম্যানেজার সক্রিয়' : '🎉 মেস মেম্বার যুক্ত হয়েছেন',
@@ -958,7 +1047,7 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
           : `স্বাগতম ${nameBangla}! আপনার একাউন্ট প্রস্তুত এবং আপনি সফলভাবে প্রবেশ করেছেন।`,
       };
     },
-    [userAccounts, sendPushNotification]
+    [userAccounts, members, sendPushNotification, syncStateWithServer]
   );
 
   // 5. Authentication: Logout Function
@@ -1064,6 +1153,7 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Broadcast live sync
     broadcastSync(updatedLogs, emittedNotif);
+    syncStateWithServer({ marketLogs: updatedLogs });
 
     setTimeout(() => {
       setIsSyncing(false);
@@ -1094,6 +1184,7 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     broadcastSync(newLogs, notif);
+    syncStateWithServer({ marketLogs: newLogs });
   };
 
   const getLogByDate = (dateStr: string) => {
@@ -1166,6 +1257,7 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     broadcastSync(marketLogs, emittedNotif, updatedExpenses);
+    syncStateWithServer({ setupExpenses: updatedExpenses });
 
     setTimeout(() => {
       setIsSyncing(false);
@@ -1193,6 +1285,7 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     broadcastSync(marketLogs, notif, newExpenses);
+    syncStateWithServer({ setupExpenses: newExpenses });
   };
 
   const totalSetupExpense = useMemo(() => {
@@ -1213,6 +1306,11 @@ export const MessProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSelectedDate(getTodayDateString());
     setSearchQuery('');
     setSelectedFilter('all');
+
+    // Trigger central database reset
+    fetch('/api/reset', { method: 'POST' }).catch((err) => {
+      console.error("Failed to reset central server:", err);
+    });
 
     const notif = sendPushNotification(
       '🔄 প্রাথমিক ডেমো ডেটা রিস্টোর সম্পন্ন',
